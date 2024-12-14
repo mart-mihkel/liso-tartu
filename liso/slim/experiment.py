@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict
 
 import numpy as np
+from liso.datasets.tartu_raw_torch_dataset import TartuRawDataset, get_tartu_train_dataset
 import torch
 from liso.datasets.argoverse2.av2_torch_dataset import (
     get_av2_train_dataset,
@@ -310,6 +311,16 @@ class Experiment:
                 shuffle=False,
             )
             val_on_train_loader = None
+        elif self.cfg.data.source == "tartu":
+            t0_t1_loader, t0_t1_ds = get_tartu_train_dataset(
+                cfg=self.cfg, use_skip_frames="never", **ds_args
+            )
+            t0_t2_loader, _ = get_tartu_train_dataset(
+                cfg=self.cfg, use_skip_frames="only", **ds_args
+            )
+            # NOTE: we have no validation data
+            val_loader, _ = (None, None)
+            val_on_train_loader = None
 
         assert len(t0_t1_loader) == len(t0_t2_loader), "missed frames"
 
@@ -540,7 +551,7 @@ class Experiment:
                     max_train_eval_iter = 5
                     max_val_eval_iter = 5
                     print("Warning: EVAL ON SUPER FEW SAMPLES")
-                if isinstance(self.val_on_train_loader.dataset, KittiRawDataset):
+                if isinstance(self.val_on_train_loader.dataset, (KittiRawDataset, TartuRawDataset)):
                     print(
                         f"Skipping validation on {self.val_on_train_loader.dataset.__class__.__name__}: No GT available!"
                     )
@@ -559,6 +570,7 @@ class Experiment:
 
     def eval_model(self, name, data_loader, max_iterations=None):
         curr_time = datetime.now()
+
         print(
             f"{curr_time}:Running validation on {name} {data_loader.dataset.__class__.__name__}: Dataset size: {len(data_loader)}, eval on {max_iterations} batches."
         )

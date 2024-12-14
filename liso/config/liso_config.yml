@@ -107,9 +107,17 @@ default:
         slim_flow:
           slim_bev_120m:
             local: "/mnt/LISO_DATA_DIR/flow_slim/kitti_raw_inference_920/e8883/20230415_130852/preds"
-    source: "toy"
-    flow_source: "gt"
-    odom_source: "gt"
+      tartu:
+        local: "/mnt/LISO_DATA_DIR/selfsupervised_OD/tartu"
+        box_dbs:
+          local: "/mnt/LISO_DATA_DIR/selfsupervised_OD/mined_dbs/tartu"
+        slim_flow:
+          slim_bev_120m:
+            local: "/mnt/LISO_DATA_DIR/flow_slim/inference_logs/5b75d/20241210_142508/preds"
+
+    source: "tartu"
+    flow_source: "slim_bev_120m"
+    odom_source: "kiss_icp"
     ground_height_map:
       ground_threshold: -1.5
     limit_pillar_height: True
@@ -512,6 +520,10 @@ kitti:
   data:
     source: kitti
 
+tartu:
+  data:
+    source: tartu
+
 bev_100m_512:
   data:
     img_grid_size: !tuple
@@ -633,6 +645,10 @@ centerpoint:
 train_250k_steps:
   optimization:
     num_training_steps: 250000
+
+train_90k_steps:
+  optimization:
+    num_training_steps: 90000
 
 batch_size_four:
   data:
@@ -777,6 +793,11 @@ slim_kitti:
   meta_cfgs:
     - slim_low_res_loss_cfg
     - kitti
+
+slim_tartu:
+  meta_cfgs:
+    - slim_low_res_loss_cfg
+    - tartu
 
 slim_low_res_loss_cfg:
   SLIM:

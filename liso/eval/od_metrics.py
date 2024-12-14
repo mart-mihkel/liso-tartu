@@ -1133,26 +1133,27 @@ class ObjectDetectionMetrics(BaseODMetrics):
                 all_per_class_specific_padding_scores[class_name][matching_thresh] = {}
 
                 for category in self.extra_categories:
+                    # NOTE: gt things might be empty with no val data
                     all_per_class_specific_gt[class_name][matching_thresh][
                         category
                     ] = np.concatenate(
                         self.per_class_per_thresh_per_category_gt_labels[class_name][
                             matching_thresh
-                        ][category]
+                        ][category] or [[]]
                     )
                     all_per_class_specific_scores[class_name][matching_thresh][
                         category
                     ] = np.concatenate(
                         self.per_class_per_thresh_per_category_scores[class_name][
                             matching_thresh
-                        ][category]
+                        ][category] or [[]]
                     )
                     all_per_class_specific_is_fn[class_name][matching_thresh][
                         category
                     ] = np.concatenate(
                         self.per_class_per_thresh_per_category_is_fn[class_name][
                             matching_thresh
-                        ][category]
+                        ][category] or [[]]
                     )
                     assert (
                         all_per_class_specific_gt[class_name][matching_thresh][

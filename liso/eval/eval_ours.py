@@ -254,6 +254,10 @@ def run_val(
         for (min_range, max_range) in range_bins
     }
     flow_metrics = FlowMetrics(range_bins=(0.0, 25.0, 50.0, 75.0, 100.0))
+
+    # NOTE: val_loader migth be empty if we have no val data
+    val_step = 0
+    
     for val_step, train_data in enumerate(
         tqdm(val_loader, total=max_num_steps, disable=False)
     ):

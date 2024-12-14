@@ -11,6 +11,7 @@ from liso.datasets.create_gt_augm_database import (
     build_augmentation_db_from_actual_groundtruth,
 )
 from liso.datasets.kitti_raw_torch_dataset import KittiRawDataset
+from liso.datasets.tartu_raw_torch_dataset import TartuRawDataset
 from liso.datasets.torch_dataset_commons import lidar_dataset_collate_fn, worker_init_fn
 from liso.eval.eval_ours import run_val
 from liso.kabsch.main_utils import (
@@ -99,6 +100,7 @@ def main():
         cfg.data.paths.nuscenes.box_dbs.local = "/tmp/box_dbs/nuscenes"
         cfg.data.paths.waymo.box_dbs.local = "/tmp/box_dbs/nuscenes"
         cfg.data.paths.kitti.box_dbs.local = "/tmp/box_dbs/nuscenes"
+        cfg.data.paths.tartu.box_dbs.local = "/tmp/box_dbs/nuscenes"
         max_size_of_sv_db_mb = 1
         _num_rounds = 2
         cfg.optimization.rounds.steps_per_round = 3
@@ -291,7 +293,7 @@ def main():
                 global_step=global_step,
             )
 
-            if not isinstance(clean_dataset_for_db_creation, KittiRawDataset):
+            if not isinstance(clean_dataset_for_db_creation, (KittiRawDataset, TartuRawDataset)):
                 # we don't have boxes or flow in the kitti raw to evaluate against
                 eval_mined_boxes_loader = torch.utils.data.DataLoader(
                     clean_dataset_for_db_creation,
@@ -662,26 +664,32 @@ def main():
                     max_num_steps=20 if fast_test else 200,
                 )
             box_predictor.eval()
-            run_val(
-                val_cfg,
-                val_loader,
-                box_predictor,
-                recursive_device_mover,
-                "online_val/",
-                fwd_writer,
-                global_step,
-                max_num_steps=cfg.validation.num_val_steps,
-            )
-            run_val(
-                cfg,
-                val_on_train_loader,
-                box_predictor,
-                recursive_device_mover,
-                "val_on_train/",
-                fwd_writer,
-                global_step,
-                max_num_steps=cfg.validation.num_val_on_train_steps,
-            )
+
+            # NOTE: skipping validation on tartu data
+            # got error TypeError: accumulate() got multiple values for argument 'verbose'
+            if cfg.data.source == "tartu":
+                print(f"Skipping run_val, tartu dataset has no ground truth")
+            else:
+                run_val(
+                    val_cfg,
+                    val_loader,
+                    box_predictor,
+                    recursive_device_mover,
+                    "online_val/",
+                    fwd_writer,
+                    global_step,
+                    max_num_steps=cfg.validation.num_val_steps,
+                )
+                run_val(
+                    cfg,
+                    val_on_train_loader,
+                    box_predictor,
+                    recursive_device_mover,
+                    "val_on_train/",
+                    fwd_writer,
+                    global_step,
+                    max_num_steps=cfg.validation.num_val_on_train_steps,
+                )
             torch.cuda.empty_cache()  # let's hope that fixes OOM?
             box_predictor.train()
         if trigger_reset_network_optimizer_scheduler_after_val:
@@ -696,27 +704,31 @@ def main():
             trigger_reset_network_optimizer_scheduler_after_val = False
 
     if not (args.profile or args.cprofile):
-        run_val(
-            val_cfg,
-            val_loader,
-            box_predictor,
-            recursive_device_mover,
-            "online_val/",
-            fwd_writer,
-            global_step,
-            max_num_steps=cfg.validation.num_val_steps,
-        )
-        # run final validation
-        run_val(
-            val_cfg,
-            val_loader,
-            box_predictor,
-            recursive_device_mover,
-            "complete_eval/",
-            fwd_writer,
-            global_step,
-            max_num_steps=cfg.validation.num_val_steps,
-        )
+        # NOTE: skipping validation: see note above
+        if cfg.data.source == "tartu":
+            print(f"Skipping final run_val, tartu dataset has no ground truth")
+        else:
+            run_val(
+                val_cfg,
+                val_loader,
+                box_predictor,
+                recursive_device_mover,
+                "online_val/",
+                fwd_writer,
+                global_step,
+                max_num_steps=cfg.validation.num_val_steps,
+            )
+            # run final validation
+            run_val(
+                val_cfg,
+                val_loader,
+                box_predictor,
+                recursive_device_mover,
+                "complete_eval/",
+                fwd_writer,
+                global_step,
+                max_num_steps=cfg.validation.num_val_steps,
+            )
 
         _ = save_experiment_state(
             checkpoint_dir, box_predictor, optimizer, lr_scheduler, global_step

@@ -1201,6 +1201,11 @@ class LidarDataset(torch.utils.data.Dataset):
         self, sample_content, point_flow_src_key, time_src_key, time_target_key
     ):
         flow_key = f"flow_{time_src_key}_{time_target_key}"
+
+        # NOTE: might not have ground truth
+        if point_flow_src_key not in sample_content:
+            sample_content[point_flow_src_key] = {}
+
         if flow_key in sample_content[point_flow_src_key]:
             flow = sample_content[point_flow_src_key][flow_key]
             flow_gt_bev = scatter_mean_nd_numpy(
@@ -1382,7 +1387,7 @@ class LidarDataset(torch.utils.data.Dataset):
                             sample_content[data_category][key_flow_trgt_src]
                         ),
                     )[..., 0:3].astype(np.float32)
-        if dataset_name in ("kitti", "nuscenes"):
+        if dataset_name in ("kitti", "tartu", "nuscenes"):
             if "objects" in sample_content["gt"]:
                 for obj in sample_content["gt"]["objects"]:
                     for timestamp in ("t0", "t1", "t2"):
@@ -1791,8 +1796,8 @@ class LidarDataset(torch.utils.data.Dataset):
 
         discretization_resolution = 2 * np.pi / np.random.choice([600, 900, 1200, 1500])
 
-        azi_idx = (azimuth_angle / discretization_resolution).astype(np.int)
-        ele_idx = (elevation_angle / discretization_resolution).astype(np.int)
+        azi_idx = (azimuth_angle / discretization_resolution).astype(int)
+        ele_idx = (elevation_angle / discretization_resolution).astype(int)
 
         spherical_drop_ratio = np.random.choice([1, 2])
 

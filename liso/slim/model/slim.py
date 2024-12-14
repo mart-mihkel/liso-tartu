@@ -90,10 +90,10 @@ class SLIM(nn.Module):  # type:ignore
                 # "metrics_label_dict": summaries["metrics_label_dict"],
                 # "label_mapping": summaries["label_mapping"],
             }
+
             gt_flow_bev_fw = sample_data_t0.get("gt", {}).get("flow_bev_ta_tb", None)
             if gt_flow_bev_fw is not None:
                 gt_flow_bev_fw = gt_flow_bev_fw.to(net_output_0_1.device)
-
             prediction_fw = self.head_decoder_fw(
                 net_output_0_1,
                 dynamicness_threshold=self.moving_dynamicness_threshold.value(),
@@ -105,8 +105,9 @@ class SLIM(nn.Module):  # type:ignore
                 ),
                 pc=sample_data_t0["pcl_ta"]["pcl"].to(net_output_0_1.device),
                 filled_pillar_mask=filled_pillar_mask_t0,
-                odom=sample_data_t0["gt"]["odom_ta_tb"].to(net_output_0_1.device),
-                inv_odom=sample_data_t1["gt"]["odom_ta_tb"].to(net_output_0_1.device),
+                # NOTE: we don't have ground truth, not sure if using kiss_icp is bad
+                odom=sample_data_t0["kiss_icp"]["odom_ta_tb"].to(net_output_0_1.device),
+                inv_odom=sample_data_t1["kiss_icp"]["odom_ta_tb"].to(net_output_0_1.device),
                 summaries=cur_summaries,
                 gt_flow_bev=gt_flow_bev_fw,
                 ohe_gt_stat_dyn_ground_label_bev_map=sample_data_t0.get(
@@ -128,8 +129,9 @@ class SLIM(nn.Module):  # type:ignore
                 ),
                 pc=sample_data_t1["pcl_ta"]["pcl"].to(net_output_1_0.device),
                 filled_pillar_mask=filled_pillar_mask_t1,
-                odom=sample_data_t1["gt"]["odom_ta_tb"].to(net_output_1_0.device),
-                inv_odom=sample_data_t0["gt"]["odom_ta_tb"].to(net_output_1_0.device),
+                # NOTE: same as above
+                odom=sample_data_t1["kiss_icp"]["odom_ta_tb"].to(net_output_1_0.device),
+                inv_odom=sample_data_t0["kiss_icp"]["odom_ta_tb"].to(net_output_1_0.device),
                 gt_flow_bev=gt_flow_bev_bw,
                 summaries=cur_summaries,
                 ohe_gt_stat_dyn_ground_label_bev_map=sample_data_t1.get(

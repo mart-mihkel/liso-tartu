@@ -20,13 +20,14 @@ from liso.datasets.kitti_tracking_torch_dataset import (
     get_kitti_val_dataset,
 )
 from liso.datasets.nuscenes_torch_dataset import NuscenesDataset
+from liso.datasets.tartu_raw_torch_dataset import TartuRawDataset
 from liso.datasets.torch_dataset_commons import (
     LidarDataset,
     get_points_in_boxes_mask,
     lidar_dataset_collate_fn,
     worker_init_fn,
 )
-from liso.datasets.waymo_torch_dataset import WaymoDataset
+from liso.dataets.waymo_torch_dataset import WaymoDataset
 from liso.eval.eval_ours import count_box_points_in_kitti_annotated_fov, run_val
 from liso.kabsch.main_utils import get_network_input_pcls
 from liso.kabsch.mask_dataset import RecursiveDeviceMover
@@ -320,7 +321,7 @@ def get_sequence_id(cfg, meta_data):
     sample_ids = meta_data["sample_id"]
     if cfg.data.source in ("nuscenes", "waymo"):
         return [sid.split("_")[0] for sid in sample_ids]
-    elif cfg.data.source == "kitti":
+    elif cfg.data.source in ("kitti", "tartu"):
         return sample_ids
     elif cfg.data.source == "av2":
         return [sid.split("/")[2] for sid in sample_ids]
@@ -331,7 +332,8 @@ def get_sequence_id(cfg, meta_data):
 def get_odometry_gt_odmetry_and_flow(dataset, cfg, sample_data_t0, device):
     pointwise_flow_t0_t1 = sample_data_t0[cfg.data.flow_source]["flow_ta_tb"].to(device)
     odom_t0_t1 = sample_data_t0[cfg.data.odom_source]["odom_ta_tb"][0]
-    gt_odom_t0_t1 = sample_data_t0["gt"]["odom_ta_tb"][0]
+    # NOTE: no ground truthm changed to kiss_icp, don't know if it's ok
+    gt_odom_t0_t1 = sample_data_t0["kiss_icp"]["odom_ta_tb"][0]
     ptwise_gt_flow_t0_t1 = sample_data_t0.get("gt", {}).get("flow_ta_tb", None)
     if ptwise_gt_flow_t0_t1 is None:
         ptwise_gt_flow_t0_t1 = pointwise_flow_t0_t1
@@ -415,20 +417,20 @@ class PCLBoxGifSummary:
         self.pcl_npy_imgs_f32.append(blank_canvas)
 
     def log_gif(self, npy_imgs_f32, writer_prefix: str, global_step: int) -> None:
-        # self.summary_writer.add_video(
-        #     writer_prefix,
-        #     (255 * np.array(npy_imgs_f32)[None]).astype(np.uint8),
-        #     global_step=global_step,
-        #     fps=10,
-        # )
+        self.summary_writer.add_video(
+            writer_prefix,
+            (255 * np.array(npy_imgs_f32)[None]).astype(np.uint8),
+            global_step=global_step,
+            fps=10,
+        )
         images = [Image.fromarray((img * 255).astype(np.uint8)) for img in npy_imgs_f32]
 
-        # dest = (
-        #     Path(self.summary_writer.get_logdir())
-        #     / f"global_step_{global_step}"
-        #     / writer_prefix
-        # )
-        # dest.mkdir(exist_ok=True, parents=True)
+        dest = (
+            Path(self.summary_writer.get_logdir())
+            / f"global_step_{global_step}"
+            / writer_prefix
+        )
+        dest.mkdir(exist_ok=True, parents=True)
         duration = int(100 * self.time_between_frames_s / 0.1)
         if self.log_to_disk:
             path_to_gif = (
@@ -525,7 +527,7 @@ def track_boxes_on_data_sequence(
         if verbose:
             log_freq = 1
         else:
-            log_freq = {"waymo": 10, "kitti": 10, "nuscenes": 20, "av2": 20}[
+            log_freq = {"waymo": 10, "kitti": 10, "nuscenes": 20, "av2": 20, "tartu": 10}[
                 cfg.data.source
             ]
     if writer is not None:
@@ -580,10 +582,16 @@ def track_boxes_on_data_sequence(
         ]
         interesting_nusc_sequence_ids = ["scene-0019", "scene-0181", "scene-0158"]
 
+        # NOTE: randomly picked
+        interesting_tartu_sequence_ids = [
+            "2024-03-25-16-42-16_mapping_tartu_0"
+        ]
+
         interesting_sequences = {
             "waymo": waymo_plot_sequences,
             "kitti": intersting_kitti_sequences,
             "nusces": interesting_nusc_sequence_ids,
+            "tartu": interesting_tartu_sequence_ids,
         }
 
         visualize_these_sequences = interesting_sequences[cfg.data.source]
@@ -607,7 +615,7 @@ def track_boxes_on_data_sequence(
                     img_grid_size=(1024, 1024),
                     time_between_frames_s=time_between_frames_s,
                     log_to_disk=log_gifs_to_disk,
-                )
+               )
             if dump_sequences_for_visu:
                 if len(visualize_these_sequences) == 0:
                     seq = None
@@ -2321,6 +2329,23 @@ def get_clean_train_dataset_single_batch(cfg, for_tracking=False, need_flow=True
             )
         else:
             raise NotImplementedError(cfg.data.train_on_box_source)
+    elif cfg.data.source == "tartu":
+        if cfg.data.train_on_box_source == "mined":
+            train_dataset = TartuRawDataset(
+                mode="train",
+                cfg=cfg,
+                use_geom_augmentation=False,
+                use_skip_frames="never",
+                pure_inference_mode=False,
+                training_target="object",  # trigger slim flow loading
+                for_tracking=for_tracking,
+                shuffle=False,
+                need_flow=need_flow,
+            )
+        elif cfg.data.train_on_box_source == "gt":
+            raise NotImplementedError("No ground truth for tartu data")
+    else:
+        raise NotImplementedError(cfg.data.train_on_box_source)
 
     return train_dataset
 

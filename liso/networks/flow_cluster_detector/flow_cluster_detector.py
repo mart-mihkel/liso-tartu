@@ -175,7 +175,7 @@ class FlowClusterDetector(torch.nn.Module):
 
                 clustered_regions = regionprops(bev_labels)
                 box_center_pix = np.clip(
-                    np.array([el.centroid for el in clustered_regions]).astype(np.int),
+                    np.array([el.centroid for el in clustered_regions]).astype(int),
                     a_min=0,
                     a_max=min(self.grid_pts_3d.shape[:-1]) - 1,
                 )

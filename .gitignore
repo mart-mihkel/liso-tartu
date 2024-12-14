@@ -144,3 +144,7 @@ None/
 
 *.secret
 cuda-keyring_1.0-1_all.deb
+
+# tartu docker and singularit images
+tartu/liso_tartu.tar
+tartu/liso_tartu.sif
